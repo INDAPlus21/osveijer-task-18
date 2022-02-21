@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::fs::File;
 use std::io::{self, BufRead, Write};
+use indicatif;
 
 #[derive(Clone)]
 struct Entry {
@@ -9,17 +10,14 @@ struct Entry {
 }
 
 impl Entry {
-    fn new(_data: &String) -> Entry {
-        let k = hash(&_data.split_whitespace().map(|s| s.to_string()).collect::<Vec<String>>()[0]);
-        let d = "#".to_string() + &_data;
+    fn new(_data: &String, byte_index: usize) -> Entry {
+        let word = &_data.split_whitespace().map(|s| s.to_string()).collect::<Vec<String>>()[0];
+        let k = hash(word);
+        let d = word.to_string() + " " + &byte_index.to_string() + "\n";
         Entry {
             data: d,
             key: k
         }
-    }
-
-    fn end(&self) -> usize {
-        self.key + self.data.len()
     }
 }
 
@@ -31,36 +29,51 @@ fn main() {
 
     let lines = read_lines(in_path);
 
-    println!("creating entries...");
+    println!("creating entries");
     
     let mut entries: Vec<Entry> = Vec::new();
 
+    let ce_bar = indicatif::ProgressBar::new(lines.len() as u64);
+
+    let mut byte_index = 0usize;
     for i in &lines {
-        let mut entry = Entry::new(&i);
-        move_key(&mut entry, 0, &entries);
+        let entry = Entry::new(&i, byte_index);
+        byte_index += i.as_bytes().len() + 1;
         entries.push(entry);
+        ce_bar.inc(1);
     }
+
+    ce_bar.finish();
 
     println!("sorting...");
 
     let len = entries.len();
     sort_entries(&mut entries, 0, len);
 
-    println!("creating data string...");
+    println!("writing...");
 
-    let mut data = "".to_string();
+    let file = File::create(out_path).unwrap();
+    let mut file = io::LineWriter::new(file);
+    let mut file_len: usize = 0;
 
     while entries.len() > 0 {
-        for _ in 0..(entries[0].key - data.len()) {
-            data += ".";
+        let mut write = "".to_string();
+        if (entries[0].key as i64 - file_len as i64) > 0 {
+            for _ in 0..(entries[0].key - file_len - 1) {
+                write += ".";
+                file_len += 1;
+            }
+            write += "\n";
+            file_len += 1;
+            file.write_all(write.as_bytes()).expect("unable to write");
         }
-        data += &entries[0].data;
+        let data_bytes =  entries[0].data.as_bytes();
+        file.write_all(data_bytes).expect("unable to write");
+        file_len += data_bytes.len();
         entries.remove(0);
     }
 
-    println!("writing...");
-
-    write_to_file(out_path, data);
+    println!("Done");
 
 }
 
@@ -86,23 +99,15 @@ fn swap_entries(entries: &mut Vec<Entry>, i:usize, j:usize) {
     entries[j] = temp;
 }
 
-// move keys to make sure they do not conflict witk another entry
-fn move_key(entry: &mut Entry, index: usize, entries: &Vec<Entry>) {
-    if index >= entries.len() {return;}
-    if (entry.key < entries[index].key && entry.end() > entries[index].key) || (entry.key >= entries[index].key && entry.key < entries[index].end()) {
-        entry.key = entries[index].end();
-    }
-    move_key(entry, index + 1, entries);
-}
 
 fn hash(str: &String) -> usize {
     let mut hash: usize = 0;
 
-    let mut p: usize = 2;
-    let m: usize = 1000000;
+    let mut p: usize = 8;
+    let m: usize = 10000000;
     for _c in str.encode_utf16() {
         hash += _c as usize * p;
-        p *= 2;
+        p *= 8;
     }
 
     hash = hash % m;
@@ -125,10 +130,4 @@ fn read_lines(_p: &Path) -> Vec<String> {
     };
 
     lines
-}
-
-fn write_to_file(path: &Path, data: String) {
-    let file = File::create(path).unwrap();
-        let mut file = io::BufWriter::new(file);
-        file.write_all(data.as_bytes());
 }

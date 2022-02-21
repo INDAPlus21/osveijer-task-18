@@ -47,5 +47,5 @@ fn read_lines(_p: &Path) -> Vec<String> {
 fn write_to_file(path: &Path, data: String) {
     let file = File::create(path).unwrap();
         let mut file = io::BufWriter::new(file);
-        file.write_all(data.as_bytes());
+        file.write_all(data.as_bytes()).expect("error writing");
 }
