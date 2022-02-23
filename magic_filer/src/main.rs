@@ -50,7 +50,9 @@ fn main() {
     let len = entries.len();
     sort_entries(&mut entries, 0, len);
 
-    println!("writing...");
+    println!("writing");
+
+    let w_bar = indicatif::ProgressBar::new(entries.len() as u64);
 
     let file = File::create(out_path).unwrap();
     let mut file = io::LineWriter::new(file);
@@ -61,17 +63,18 @@ fn main() {
         if (entries[0].key as i64 - file_len as i64) > 0 {
             for _ in 0..(entries[0].key - file_len - 1) {
                 write += ".";
-                file_len += 1;
             }
             write += "\n";
-            file_len += 1;
-            file.write_all(write.as_bytes()).expect("unable to write");
         }
-        let data_bytes =  entries[0].data.as_bytes();
-        file.write_all(data_bytes).expect("unable to write");
-        file_len += data_bytes.len();
+        write +=  &entries[0].data;
+        let write_bytes = write.as_bytes();
+        file_len += write_bytes.len();
+        file.write_all(write_bytes).expect("unable to write");
         entries.remove(0);
+        w_bar.inc(1);
     }
+
+    w_bar.finish();
 
     println!("Done");
 

@@ -13,7 +13,7 @@ fn main() {
 
     let args = Args::parse();
 
-    let key = hash(&args.word);
+    let key = hash(&String::from_utf8_lossy(args.word.as_bytes()).to_string());
 
     let mut reader;
     match File::open(path) {
@@ -34,6 +34,10 @@ fn main() {
     buf = String::from_utf8_lossy(&raw_buf).to_string();
 
     while buf.split_whitespace().collect::<Vec<&str>>().len() == 0 || buf.split_whitespace().collect::<Vec<&str>>()[0] != args.word {
+        if buf.split_whitespace().collect::<Vec<&str>>().len() == 0 || buf.contains(".") {
+            println!("Det finns inga förekomster av ordet.");
+            std::process::exit(1);
+        }
         let mut raw_buf = vec![];
         reader.read_until(10, &mut raw_buf).expect("error reading magic file");
         buf = String::from_utf8_lossy(&raw_buf).to_string();
